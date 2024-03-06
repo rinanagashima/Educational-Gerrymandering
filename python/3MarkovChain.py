@@ -47,30 +47,14 @@ leaid = "0402860"
 statefip = "04"
 statecrs = "EPSG:32612"
 
-# Import the NCES school districts shapefile
-#os.chdir(r"C:\Users\rinan\Box\Senior Thesis Data\School District Boundaries_NCES EDGE")
-#districts = gpd.read_file('schooldistrict_sy1516_tl16.shp')
-# combine LEAID into one (note: each obs has only one ELSDLEA, UNSDLEA, OR SCSDLEA id, so they do not need 
-# to be separate columns)
-#districts['LEAID'] = districts.apply(
-#    lambda row: row['ELSDLEA'] if pd.notna(row['ELSDLEA']) 
-#    else (row['UNSDLEA'] if pd.notna(row['UNSDLEA']) 
-#    else row['SCSDLEA']),
- #   axis=1
-#)
-# keep only Arizona
-#districts_az = districts[districts['STATEFP'] == statefip]
-# save only Arizona districts
-#districts_az.to_file(r'C:\Users\rinan\Box\Senior Thesis Data\School District Boundaries_NCES EDGE\04\schooldistrict_sy1516_tl16_04.shp')
-
 # Import the Arizona school districts
-os.chdir(r"C:\Users\rinan\Box\Senior Thesis Data\School District Boundaries_NCES EDGE\04")
+os.chdir(r"C:\Users\rinan\Box\Senior Thesis\data\04\district")
 districts = gpd.read_file('schooldistrict_sy1516_tl16_04.shp')
 selected_district = districts[districts['GEOID'] == leaid]
 
 
 # Import the Arizona census blocks graph: 
-os.chdir(r"C:\Users\rinan\Box\Senior Thesis Data\Census block shapefiles\tl_2010_04_tabblock10")
+os.chdir(r"C:\Users\rinan\Box\Senior Thesis\data\04\tl_2010_04_tabblock10")
 arizona_bl = gpd.read_file('tl_2010_04_tabblock10.shp')
 
 
@@ -119,24 +103,14 @@ arizona_bl_within_district = arizona_bl_within_district.to_crs(statecrs)
 
 
 # Turn into a dual graph
-az_bl_dg = Graph.from_geodataframe(arizona_bl_within_district, ignore_errors=False)
+az_bl_dg = Graph.from_geodataframe(arizona_bl_within_district, ignore_errors=True)
 
 # Step 2: Create a mapping of 'GEOID10' to geometry
 geoid_to_geometry = arizona_bl_within_district.set_index('GEOID10')['geometry'].to_dict()
 
 
-
-# Import the NCES SABS shapefile:
-#os.chdir(r"C:\Users\rinan\Box\Senior Thesis Data\SABS_NCES_15-16")
-#sabs = gpd.read_file('SABS_1516_Primary.shp')
-
-# Save only the Arizona shapefile
-#sabs_az = sabs[sabs['stAbbrev'] == 'AZ']
-#sabs_az.to_file(r'C:\Users\rinan\Box\Senior Thesis Data\SABS_NCES_15-16\04\SABS_1516_Primary_04.shp') #Arizona fips code is 04
-
-
 # Import the Arizona shapefile
-os.chdir(r"C:\Users\rinan\Box\Senior Thesis Data\SABS_NCES_15-16\04")
+os.chdir(r"C:\Users\rinan\Box\Senior Thesis\data\04\sabs")
 sabs_az = gpd.read_file('SABS_1516_Primary_04.shp')
 selected_sabs_az = sabs_az[sabs_az['leaid'] == leaid]
 
@@ -153,16 +127,8 @@ plt.axis('off')
 plt.show()
 
 
-# Import the NCES school site point geometries
-#os.chdir(r"C:\Users\rinan\Box\Senior Thesis Data\Schools_NCES_15-16\EDGE_GEOCODE_PUBLICSCH_1516")
-#edge_geocode = gpd.read_file('EDGE_GEOCODE_PUBLICSCH_1516.shp')
-
-# Save only the Arizona shapefile
-#edge_az = edge_geocode[edge_geocode['STFIP15']=="04"]
-#edge_az.to_file(r'C:\Users\rinan\Box\Senior Thesis Data\Schools_NCES_15-16\04\EDGE_GEOCODE_1516_PUBLICSCH_04.shp')
-
 # Import the Arizona NCES school site point geometries
-os.chdir(r"C:\Users\rinan\Box\Senior Thesis Data\Schools_NCES_15-16\04")
+os.chdir(r"C:\Users\rinan\Box\Senior Thesis\data\04\schools")
 schsite_az = gpd.read_file('EDGE_GEOCODE_1516_PUBLICSCH_04.shp')
 # Reproject edge_az to match the CRS of arizona_bl
 schsite_az = schsite_az.to_crs(arizona_bl.crs)
@@ -181,7 +147,7 @@ teacher-student ratios.
 """
 
 # import urban institute data (REPLACE with fully merged data later)
-os.chdir(r"C:\Users\rinan\Box\Senior Thesis Data\Stata code\urbaninst\output\dta")
+os.chdir(r"C:\Users\rinan\Box\Senior Thesis\code\Educational-Gerrymandering\stata\output\dta")
 ccd = pd.read_stata("mergedurbanschooldata.nvc.dta")
 # Filter rows where 'fips' is equal to 'Arizona'
 ccd_az = ccd[ccd['fips'] == 4]
@@ -354,7 +320,7 @@ and constraints for running the short bursts.
 
 ## first, import the pop data by race
 # import census data
-os.chdir(r"C:\Users\rinan\Box\Senior Thesis Data\Stata code\urbaninst\output\dta")
+os.chdir(r"C:\Users\rinan\Box\Senior Thesis\code\Educational-Gerrymandering\stata\output\dta")
 census_az = pd.read_stata("mergedcensusracedata_az.nvc.dta")
 
 # Keep only the rows pertaining to census blocks in the leaid

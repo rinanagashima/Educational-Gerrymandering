@@ -22,6 +22,12 @@ from gerrychain.tree import recursive_tree_part
 same result twice, we can run the code with exactly the same random seed. """
 random.seed(48)
 
+# set district number, state fip, and state crs
+leaid = "0402860"
+# leaid = "0409060"
+statefip = "04"
+statecrs = "EPSG:32612"
+
 
 '''
 Inputs: 
@@ -160,15 +166,9 @@ for state in states:
 # Handle Directories
 python_dir = os.getcwd()  # Get current directory
 edu_gerry_dir = os.path.dirname(python_dir)
-code_dir = os.path.dirname(edu_gerry_dir)
-SeniorThesis_dir = os.path.dirname(code_dir)
+SeniorThesis_dir = os.path.dirname(edu_gerry_dir)
 data_dir = os.path.join(SeniorThesis_dir, 'data')
 
-# set district number, state fip, and state crs
-# leaid = "0402860"
-leaid = "0409060"
-statefip = "04"
-statecrs = "EPSG:32612"
 
 # Parse shapefiles for given state
 statewide_shapefiles = parse_shapefiles(statefip, statecrs, data_dir)
@@ -186,7 +186,7 @@ print("statewide_shapefiles saved to GeoPackage")
 # Read Statewide GeoPackage
 statewide_shapefiles_loaded = read_shapefiles_gpkg(output_file_statewide)
 print("statewide_shapefiles loaded from GeoPackage")
-my_shapefiles = select_shapefiles(statewide_shapefiles, leaid)
+my_shapefiles = select_shapefiles(statewide_shapefiles_loaded, leaid)
 print("my_shapefiles created")
 # # print(my_shapefiles)
 # print("-----------------------------------------------------------------------------------")
