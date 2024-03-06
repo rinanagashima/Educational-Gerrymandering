@@ -1,12 +1,22 @@
 # -*- coding: utf-8 -*-
 """
-Created on Mon Mar  4 16:08:44 2024
+Created on Mon Nov  6 08:51:21 2023
 
 @author: rinan
-
-made some edits to check version control
 """
 
+
+"""
+"This document runs short bursts on Arizona's census block data. The ideal population of
+each SAB is based on each school's current enrollment. The existing SABs are used as the seed plan
+from which the short burst starts. In the future, we may want to start with a completely random seed plan.
+Then, the short bursts are run according to the specific parameters (burst length and number of bursts), 
+recording the best spatial dissimilarity index observed in each burst and the ensemble of bursts.
+
+This code is based on AZ_Markov_Chain_bg_unadj.py from my final project in 
+Professor Cannon's Math of Political Districting class.
+
+"""
 
 # Import the relevant libraries to run short bursts: 
 import matplotlib.pyplot as plt
@@ -20,6 +30,12 @@ import zipfile
 import os
 import pandas as pd
 import networkx as nx
+import fiona
+
+# Import attributes of gerrychain that we need to create the initial partition: 
+from gerrychain import Graph, Partition, Election, proposals, updaters, constraints, accept 
+from gerrychain.updaters import cut_edges, Tally
+from gerrychain.tree import recursive_tree_part
 
 
 """This is to make the code more replicable. For example, if we want the 
@@ -27,66 +43,52 @@ same result twice, we can run the code with exactly the same random seed. """
 random.seed(48)
 
 
-# Import attributes of gerrychain that we need to create the initial partition: 
-from gerrychain import Graph, Partition, Election, proposals, updaters, constraints, accept 
-from gerrychain.updaters import cut_edges, Tally
-from gerrychain.tree import recursive_tree_part
+def read_shapefiles_gpkg(input_file):
+    """
+    Reads layers from a GeoPackage and returns them as a list of GeoDataFrames.
+    """
+    import geopandas as gpd
+    layers = fiona.listlayers(input_file)
+    geo_dataframes = [gpd.read_file(input_file, layer=layer) for layer in layers]
+    return geo_dataframes
 
-# set district number
-leaid = "0404630"
+'''
+Framework for automating repeating this entire file for different states
+
+def read_csv(excel sheet)
+    make function that reads csv file into an array where index 1 (row) is state and index 2 (col) is either fip or crs
+
+def get_fip_crs(state):
+    state_data = read_csv(excel sheet)
+    fip = state_data[state]['fip']
+    crs = state_data[state]['crs']
+    return fip, crs
+
+# for AZ and TX
+states = ['AZ', 'TX']  # put the rest of your states here
+for state in states:
+    fip, crs = get_fip_crs(state)
+    # literally the rest of the file
+'''
+
+# Handle Directories
+python_dir = os.getcwd()  # Get current directory
+edu_gerry_dir = os.path.dirname(python_dir)
+code_dir = os.path.dirname(edu_gerry_dir)
+SeniorThesis_dir = os.path.dirname(code_dir)
+data_dir = os.path.join(SeniorThesis_dir, 'data')
+
+# set district number, state fip, and state crs
+# leaid = "0402860"
+leaid = "0409060"
 statefip = "04"
 statecrs = "EPSG:32612"
 
-# Import the NCES school districts shapefile
-#os.chdir(r"C:\Users\rinan\Box\Senior Thesis Data\School District Boundaries_NCES EDGE")
-#districts = gpd.read_file('schooldistrict_sy1516_tl16.shp')
-# combine LEAID into one (note: each obs has only one ELSDLEA, UNSDLEA, OR SCSDLEA id, so they do not need 
-# to be separate columns)
-#districts['LEAID'] = districts.apply(
-#    lambda row: row['ELSDLEA'] if pd.notna(row['ELSDLEA']) 
-#    else (row['UNSDLEA'] if pd.notna(row['UNSDLEA']) 
-#    else row['SCSDLEA']),
- #   axis=1
-#)
-# keep only Arizona
-#districts_az = districts[districts['STATEFP'] == statefip]
-# save only Arizona districts
-#districts_az.to_file(r'C:\Users\rinan\Box\Senior Thesis Data\School District Boundaries_NCES EDGE\04\schooldistrict_sy1516_tl16_04.shp')
+# Shapefiles for specific district
+output_file_my = os.path.join(data_dir, statefip, 'geopackages', leaid, 'my_shapefiles.gpkg')
+my_shapefiles_loaded = read_shapefiles_gpkg(output_file_my)
+print("my_shapefiles loaded from GeoPackage")
 
-# Import the Arizona school districts
-os.chdir(r"C:\Users\rinan\Box\Senior Thesis Data\School District Boundaries_NCES EDGE\04")
-districts = gpd.read_file('schooldistrict_sy1516_tl16_04.shp')
-selected_district = districts[districts['GEOID'] == leaid]
-
-
-
-# Import the Arizona census blocks graph: 
-os.chdir(r"C:\Users\rinan\Box\Senior Thesis Data\Census block shapefiles\tl_2010_04_tabblock10")
-arizona_bl = gpd.read_file('tl_2010_04_tabblock10.shp')
-
-
-# Ensure both geodataframes have the same CRS
-if arizona_bl.crs != selected_district.crs:
-    selected_district = selected_district.to_crs(arizona_bl.crs)
-    
-# Reset the index of arizona_bl and keep the old index as a column
-arizona_bl_reset = arizona_bl.reset_index()
-
-# Perform an intersection to calculate the overlap area
-intersections = gpd.overlay(arizona_bl_reset, selected_district, how='intersection')
-
-# Calculate the area of each block and each intersection
-arizona_bl_reset['area'] = arizona_bl_reset.geometry.area
-intersections['overlap_area'] = intersections.geometry.area
-
-# Assuming 'index' is the name of the original arizona_bl index in intersections
-arizona_bl_reset = arizona_bl_reset.merge(intersections[['overlap_area', 'index']], on='index', how='left')
-
-# Calculate the overlap percentage
-arizona_bl_reset['overlap_percentage'] = (arizona_bl_reset['overlap_area'] / arizona_bl_reset['area']) * 100
-
-# Filter to keep only blocks with 90% or more overlap bc 100% overlap resulted in some perimeter blocks being left out
-arizona_bl_within_district = arizona_bl_reset[arizona_bl_reset['overlap_percentage'] > 50]
 
 
 # plot to make sure the census blocks are being mapped onto the school district properly
@@ -97,7 +99,7 @@ fig, ax = plt.subplots(figsize=(10, 10))
 selected_district.plot(ax=ax, color='lightblue', edgecolor='black')
 
 # Overlay the filtered Arizona census blocks within the selected district
-arizona_bl_within_district.plot(ax=ax, color='red', alpha=0.5)
+blocks_within_district.plot(ax=ax, color='red', alpha=0.5)
 
 # Customization
 ax.set_title('Census Blocks within Selected District')
@@ -105,15 +107,15 @@ ax.set_xlabel('Longitude')
 ax.set_ylabel('Latitude')
 plt.show()
 
-# reproject arizona_bl_within_district to crs for more accurate area calculations
-arizona_bl_within_district = arizona_bl_within_district.to_crs(statecrs)
+# reproject blocks_within_district to crs for more accurate area calculations
+blocks_within_district = blocks_within_district.to_crs(statecrs)
 
 
 # Turn into a dual graph
-az_bl_dg = Graph.from_geodataframe(arizona_bl_within_district, ignore_errors=False)
+az_bl_dg = Graph.from_geodataframe(blocks_within_district, ignore_errors=True)
 
 # Step 2: Create a mapping of 'GEOID10' to geometry
-geoid_to_geometry = arizona_bl_within_district.set_index('GEOID10')['geometry'].to_dict()
+geoid_to_geometry = blocks_within_district.set_index('GEOID10')['geometry'].to_dict()
 
 
 
@@ -121,19 +123,23 @@ geoid_to_geometry = arizona_bl_within_district.set_index('GEOID10')['geometry'].
 #os.chdir(r"C:\Users\rinan\Box\Senior Thesis Data\SABS_NCES_15-16")
 #sabs = gpd.read_file('SABS_1516_Primary.shp')
 
+
+#os.chdir(r"C:\Users\rinan\Box\Senior Thesis\raw\SABS_1516")
+#sabs = gpd.read_file('SABS_1516.shp')
+
 # Save only the Arizona shapefile
 #sabs_az = sabs[sabs['stAbbrev'] == 'AZ']
-#sabs_az.to_file(r'C:\Users\rinan\Box\Senior Thesis Data\SABS_NCES_15-16\04\SABS_1516_Primary_04.shp') #Arizona fips code is 04
+#sabs_az.to_file(r'C:\Users\rinan\Box\Senior Thesis\data\04\sabs\SABS_1516_04.shp') #Arizona fips code is 04
 
 
 # Import the Arizona shapefile
-os.chdir(r"C:\Users\rinan\Box\Senior Thesis Data\SABS_NCES_15-16\04")
+os.chdir(r"C:\Users\rinan\Box\Senior Thesis\data\04\sabs")
 sabs_az = gpd.read_file('SABS_1516_Primary_04.shp')
 selected_sabs_az = sabs_az[sabs_az['leaid'] == leaid]
 
 
-# Reproject sabs_az to match the CRS of arizona_bl
-selected_sabs_az = selected_sabs_az.to_crs(arizona_bl_within_district.crs)
+# Reproject sabs_az to match the CRS of blocks
+selected_sabs_az = selected_sabs_az.to_crs(blocks_within_district.crs)
 # Create a dual graph
 sabs_az_dg = Graph.from_geodataframe(selected_sabs_az, ignore_errors = True)
 
@@ -153,10 +159,10 @@ plt.show()
 #edge_az.to_file(r'C:\Users\rinan\Box\Senior Thesis Data\Schools_NCES_15-16\04\EDGE_GEOCODE_1516_PUBLICSCH_04.shp')
 
 # Import the Arizona NCES school site point geometries
-os.chdir(r"C:\Users\rinan\Box\Senior Thesis Data\Schools_NCES_15-16\04")
+os.chdir(r"C:\Users\rinan\Box\Senior Thesis\data\04\edge")
 schsite_az = gpd.read_file('EDGE_GEOCODE_1516_PUBLICSCH_04.shp')
-# Reproject edge_az to match the CRS of arizona_bl
-schsite_az = schsite_az.to_crs(arizona_bl.crs)
+# Reproject edge_az to match the CRS of blocks
+schsite_az = schsite_az.to_crs(blocks.crs)
 # Convert all column names to lowercase
 schsite_az.columns = schsite_az.columns.str.lower()
 # Create a plot of the edge_az to make sure it loaded properly
@@ -172,7 +178,7 @@ teacher-student ratios.
 """
 
 # import urban institute data (REPLACE with fully merged data later)
-os.chdir(r"C:\Users\rinan\Box\Senior Thesis Data\Stata code\urbaninst\output\dta")
+os.chdir(r"C:\Users\rinan\Box\Senior Thesis\code\Educational-Gerrymandering\stata\output\dta")
 ccd = pd.read_stata("mergedurbanschooldata.nvc.dta")
 # Filter rows where 'fips' is equal to 'Arizona'
 ccd_az = ccd[ccd['fips'] == 4]
