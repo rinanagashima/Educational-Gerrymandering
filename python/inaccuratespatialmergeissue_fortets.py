@@ -41,7 +41,9 @@ from gerrychain.tree import recursive_tree_part
 # Import functions from other files
 from a2_parser import parse_shapefiles, select_shapefiles
 from geopackage import save_shapefiles_gpkg, read_shapefiles_gpkg
-from visualizations import plot_all
+from visualizations import plot_all, plot_stackedbar
+from reapportionment import reapportion_students, apportioned_to_dg
+from markovchain import shortbursts, proposal, make_capacities_constraint
 
 """This is to make the code more replicable. For example, if we want the 
 same result twice, we can run the code with exactly the same random seed. """
@@ -379,3 +381,63 @@ plt.savefig(os.path.join(state_figures_dir, f'{leaid}_initialpartition_corrected
 
 # plot
 plt.show()
+
+
+
+"""
+Now that we finished creating the initial partition, the following code will set up the necessary specifications
+and constraints for running the short bursts.
+
+"""
+
+#### the population and race constraints should be based on census population data
+
+## first, import the pop data by race
+# import census data
+census_path = os.path.join(dta_dir, "mergedcensusracedata_az.nvc.dta")  # Census data file path
+census = pd.read_stata(census_path)
+
+# Keep only the rows pertaining to census blocks in the leaid
+geoid_list = blocks['GEOID10'].tolist()
+my_census = census[census['geoid'].isin(geoid_list)]
+
+
+## now, reapportion students from schools to census blocks based on race proportions
+apportioned_students_df, apportioned_students_nonzero = reapportion_students(full_sabs_dict, my_census, merge_sabs_sdd)
+# Now, plot the filtered DataFrame
+plot_stackedbar(apportioned_students_nonzero)
+### now, add apportioned_students df to bl_dg
+bl_dg = apportioned_to_dg(apportioned_students_df, bl_dg)
+
+
+# Update the initial partition with the population constraint
+updaters = {"population": Tally("total", alias = "population"), 
+          "black population": Tally('blackpop', alias = "black population"),
+          "hispanic population": Tally('hispanicpop', alias = "hispanic population"),
+          "asian population": Tally('asianpop', alias = "asian population"),
+          "native american population": Tally('nativeamericanpop', alias = "native american population"),
+          "native hawaiian population": Tally('nhpipop', alias = "native hawaiian population"),
+          "multiracial population": Tally('multiracepop', alias = "multiracial population"),
+          "white population": Tally('whitepop', alias = "white population")
+          }
+initial_partition = Partition(bl_dg, assignment=ncessch_assignment_dict, updaters=updaters)
+
+## Specify the parameters of the short bursts: 
+burst_length = 100  # length of each burst
+num_bursts = 50  # number of bursts in the run
+proposal1 = proposal(initial_partition)
+capacities = make_capacities_constraint(initial_partition)
+# run the short bursts markov chain
+result = shortbursts(burst_length, num_bursts, initial_partition, proposal1, capacities)
+
+
+#Input results of short burst into an excel sheet. Repeat with other burst lengths
+from openpyxl import Workbook
+wb = Workbook()
+ws =  wb.active
+ws.append(result)
+ws.title = "AZ Short Bursts Results"
+wb.save(filename = 'az_shortbursts_results.xlsx')
+wb.close()
+ 
+
