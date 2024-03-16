@@ -103,7 +103,7 @@ arizona_bl_within_district = arizona_bl_within_district.to_crs(statecrs)
 
 
 # Turn into a dual graph
-az_bl_dg = Graph.from_geodataframe(arizona_bl_within_district, ignore_errors=True)
+bl_dg = Graph.from_geodataframe(arizona_bl_within_district, ignore_errors=True)
 
 # Step 2: Create a mapping of 'GEOID10' to geometry
 geoid_to_geometry = arizona_bl_within_district.set_index('GEOID10')['geometry'].to_dict()
@@ -111,31 +111,31 @@ geoid_to_geometry = arizona_bl_within_district.set_index('GEOID10')['geometry'].
 
 # Import the Arizona shapefile
 os.chdir(r"C:\Users\rinan\Box\Senior Thesis\data\04\sabs")
-sabs_az = gpd.read_file('SABS_1516_Primary_04.shp')
-selected_sabs_az = sabs_az[sabs_az['leaid'] == leaid]
+sabs = gpd.read_file('SABS_1516_Primary_04.shp')
+selected_sabs = sabs[sabs['leaid'] == leaid]
 
 
-# Reproject sabs_az to match the CRS of arizona_bl
-selected_sabs_az = selected_sabs_az.to_crs(arizona_bl_within_district.crs)
+# Reproject sabs to match the CRS of arizona_bl
+selected_sabs = selected_sabs.to_crs(arizona_bl_within_district.crs)
 # Create a dual graph
-sabs_az_dg = Graph.from_geodataframe(selected_sabs_az, ignore_errors = True)
+sabs_dg = Graph.from_geodataframe(selected_sabs, ignore_errors = True)
 
 
-# Create a plot of the sabs_az to make sure it loaded properly
-selected_sabs_az.plot()
+# Create a plot of the sabs to make sure it loaded properly
+selected_sabs.plot()
 plt.axis('off')
 plt.show()
 
 
 # Import the Arizona NCES school site point geometries
 os.chdir(r"C:\Users\rinan\Box\Senior Thesis\data\04\schools")
-schsite_az = gpd.read_file('EDGE_GEOCODE_1516_PUBLICSCH_04.shp')
+schools = gpd.read_file('EDGE_GEOCODE_1516_PUBLICSCH_04.shp')
 # Reproject edge_az to match the CRS of arizona_bl
-schsite_az = schsite_az.to_crs(arizona_bl.crs)
+schools = schools.to_crs(arizona_bl.crs)
 # Convert all column names to lowercase
-schsite_az.columns = schsite_az.columns.str.lower()
+schools.columns = schools.columns.str.lower()
 # Create a plot of the edge_az to make sure it loaded properly
-schsite_az.plot()
+schools.plot()
 plt.axis('off')
 plt.show()
 
@@ -163,13 +163,13 @@ print(ccd_az_leaid['school_name'])
 merge_columns_ccd = ['ncessch']
 merge_columns_schsite = ['ncessch']
 # merge ccd leaid and school site locations, keeping only observations that exist in ccd_az_leaid (i.e., only the selected school district)
-merge_ccd_schsite = pd.merge(schsite_az, ccd_az_leaid, left_on=merge_columns_schsite, right_on = merge_columns_ccd, how="inner")
+merge_ccd_schsite = pd.merge(schools, ccd_az_leaid, left_on=merge_columns_schsite, right_on = merge_columns_ccd, how="inner")
 
 # keep only the sabs that are in ccd dataframe
-merge_sabs_ccd = pd.merge(merge_ccd_schsite, selected_sabs_az, left_on=['ncessch'], right_on = ['ncessch'], how="inner")
+merge_sabs_ccd = pd.merge(merge_ccd_schsite, selected_schools, left_on=['ncessch'], right_on = ['ncessch'], how="inner")
 # Set 'geometry_y' as the active geometry column, which is the attendance boundary polygons
 merge_sabs_ccd = merge_sabs_ccd.set_geometry('geometry_y')
-sabs_az_dg = Graph.from_geodataframe(merge_sabs_ccd, ignore_errors = True)
+sabs_dg = Graph.from_geodataframe(merge_sabs_ccd, ignore_errors = True)
 
 
 # Creating the initial partition: 
@@ -185,26 +185,26 @@ partition through the updaters. Specifically, we extract the number of
 cut edges, whether or not it is connected, its total population and Latino population.)
 """
 
-# Count the number of polygons in the 'geometry' column of sabs_az. This is equivalent to counting
+# Count the number of polygons in the 'geometry' column of sabs. This is equivalent to counting
 # the number of school attendance zones in the state
 
-num_sabs = len(sabs_az['geometry']) 
+num_sabs = len(sabs['geometry']) 
 # Assuming 'selected_district' is a GeoDataFrame with only one row, extract just the one district to transform from a series to a value
 district_geometry = selected_district['geometry'].iloc[0]
 
 
 # Create a new column to store SAB assignments
-for node in az_bl_dg.nodes:
-    az_bl_dg.nodes[node]['ncessch_assignment'] = None
+for node in bl_dg.nodes:
+    bl_dg.nodes[node]['ncessch_assignment'] = None
     
 # Create a dictionary to store the 'ncessch_assignment' values
 ncessch_assignment_dict = {}
 full_sabs_dict = {}
 
 # Loop through census blocks in the selected district
-for block_node in az_bl_dg.nodes:
-    block_geometry = az_bl_dg.nodes[block_node]['geometry']
-    block_num = az_bl_dg.nodes[block_node]['GEOID10']
+for block_node in bl_dg.nodes:
+    block_geometry = bl_dg.nodes[block_node]['geometry']
+    block_num = bl_dg.nodes[block_node]['GEOID10']
     block_area = block_geometry.area
 
     # Initialize the best match and its overlap percentage
@@ -216,8 +216,8 @@ for block_node in az_bl_dg.nodes:
     potential_matches = []
 
     # Loop through SABs to check containment
-    for sabs_node in sabs_az_dg.nodes:
-        sabs_geometry = sabs_az_dg.nodes[sabs_node]['geometry_y']
+    for sabs_node in sabs_dg.nodes:
+        sabs_geometry = sabs_dg.nodes[sabs_node]['geometry_y']
         intersection_area = block_geometry.intersection(sabs_geometry).area
         intersection_district = sabs_geometry.intersection(district_geometry).area
 
@@ -227,8 +227,8 @@ for block_node in az_bl_dg.nodes:
         overlap_percentage = intersection_area / block_area
 
         # Keep only those with overlap less than 98% if there is more than one sabs
-        # Count the number of nodes in the sabs_az_dg graph
-        num_sabs_nodes = len(sabs_az_dg.nodes)
+        # Count the number of nodes in the sabs_dg graph
+        num_sabs_nodes = len(sabs_dg.nodes)
         if num_sabs_nodes > 1:
             if overlap_district < .9:
                 potential_matches.append((sabs_node, overlap_percentage))
@@ -243,8 +243,8 @@ for block_node in az_bl_dg.nodes:
 
         # Assign ncessch if best overlap is greater than 0%
         if best_overlap > 0:
-            ncessch = sabs_az_dg.nodes[best_match]['ncessch']
-            block_num = az_bl_dg.nodes[block_node]['GEOID10']
+            ncessch = sabs_dg.nodes[best_match]['ncessch']
+            block_num = bl_dg.nodes[block_node]['GEOID10']
             ncessch_assignment_dict[block_node] = ncessch
             full_sabs_dict[block_num] = ncessch
         else: 
@@ -253,8 +253,8 @@ for block_node in az_bl_dg.nodes:
         print(f"No suitable SAB found for block {block_node}")
 
 
-# Set the 'ncessch_assignment' attribute for nodes in az_bl_dg
-nx.set_node_attributes(az_bl_dg, ncessch_assignment_dict, name='ncessch_assignment')
+# Set the 'ncessch_assignment' attribute for nodes in bl_dg
+nx.set_node_attributes(bl_dg, ncessch_assignment_dict, name='ncessch_assignment')
 
 # tally total number of blocks
 num_blocks = len(ncessch_assignment_dict)
@@ -262,10 +262,10 @@ num_blocks = len(ncessch_assignment_dict)
 # Check if all blocks were linked to a sabs assignment 
 no_sab_count = 0
 
-# Iterate through each node in az_bl_dg
-for node in az_bl_dg.nodes:
+# Iterate through each node in bl_dg
+for node in bl_dg.nodes:
     # Check if 'ncessch_assignment' attribute is None or empty
-    if az_bl_dg.nodes[node]['ncessch_assignment'] is None:
+    if bl_dg.nodes[node]['ncessch_assignment'] is None:
         no_sab_count += 1
         print(f"Block node {block_num} has no SAB assignment")
 
@@ -273,14 +273,14 @@ for node in az_bl_dg.nodes:
 print(f"Total blocks with no SAB: {no_sab_count} out of {num_blocks}")
 
 # now, manually assign a number to the missing nodes so that the nodes in the dict match the one in the dg
-missing_nodes = [node for node in az_bl_dg.nodes if node not in ncessch_assignment_dict]
+missing_nodes = [node for node in bl_dg.nodes if node not in ncessch_assignment_dict]
 default_value = '-9999'  # Replace with an appropriate default value
 for node in missing_nodes:
     ncessch_assignment_dict[node] = default_value
 
 
-# Create the initial_partition using the dual graph from sabs_az
-initial_partition = Partition(az_bl_dg, assignment=ncessch_assignment_dict, updaters={})
+# Create the initial_partition using the dual graph from sabs
+initial_partition = Partition(bl_dg, assignment=ncessch_assignment_dict, updaters={})
 # Create a plot of the initial partition to make sure it loaded properly
 initial_partition.plot()
 plt.axis('off')
@@ -290,7 +290,7 @@ plt.show()
 
 #### now, re-assign blocks with '-9999' based on adjacency
 # Identify and store adjacent nodes for each '-9999' node
-unassigned_nodes = {node: list(az_bl_dg.neighbors(node)) for node in az_bl_dg.nodes() if ncessch_assignment_dict[node] == '-9999'}
+unassigned_nodes = {node: list(bl_dg.neighbors(node)) for node in bl_dg.nodes() if ncessch_assignment_dict[node] == '-9999'}
 # Relabel based on adjacent nodes
 relabelled_nodes = set()  # To keep track of relabelled nodes
 for node, neighbors in unassigned_nodes.items():
@@ -301,7 +301,7 @@ for node, neighbors in unassigned_nodes.items():
             break  # Stop checking once a relabeling is done
 
 # Update the partition with the new assignments
-initial_partition = Partition(az_bl_dg, assignment=ncessch_assignment_dict, updaters={})
+initial_partition = Partition(bl_dg, assignment=ncessch_assignment_dict, updaters={})
 
 # Graph to check
 initial_partition.plot()
@@ -417,14 +417,14 @@ plt.xticks(ticks=[], labels=[])
 plt.show()
 
 
-### now, add apportioned_students df to az_bl_dg
+### now, add apportioned_students df to bl_dg
 # Convert GEOID10 to a string if it's not already, to match the geoid format in apportioned_students
 apportioned_students_df['geoid'] = apportioned_students_df['geoid'].astype(str)
 
-# Iterate through each node in the az_bl_dg graph
-for node in az_bl_dg.nodes:
+# Iterate through each node in the bl_dg graph
+for node in bl_dg.nodes:
     # Get the GEOID10 of the current node
-    geoid10 = az_bl_dg.nodes[node]['GEOID10']
+    geoid10 = bl_dg.nodes[node]['GEOID10']
     
     # Find the matching row in apportioned_students
     matching_row = apportioned_students_df[apportioned_students_df['geoid'] == geoid10]
@@ -433,11 +433,11 @@ for node in az_bl_dg.nodes:
     if not matching_row.empty:
         # Convert matching row to a dictionary and update the node
         # Note: iloc[0] is used because matching_row is a DataFrame and we need the first (and only) row as a Series
-        az_bl_dg.nodes[node].update(matching_row.iloc[0].to_dict())
+        bl_dg.nodes[node].update(matching_row.iloc[0].to_dict())
 
 
 # Update the initial partition with the population constraint
-initial_partition = Partition(az_bl_dg, assignment=ncessch_assignment_dict, updaters={"population": Tally("total", alias = "population"), 
+initial_partition = Partition(bl_dg, assignment=ncessch_assignment_dict, updaters={"population": Tally("total", alias = "population"), 
           "black population": Tally('blackpop', alias = "black population"),
           "hispanic population": Tally('hispanicpop', alias = "hispanic population"),
           "asian population": Tally('asianpop', alias = "asian population"),
@@ -453,7 +453,7 @@ initial_partition = Partition(az_bl_dg, assignment=ncessch_assignment_dict, upda
 #########
 
 # Convert 'Polygon' geometries to their WKT representation and use them for assignment
-#assignment_dict = {index: geometry.wkt for index, geometry in sabs_az['geometry'].iteritems()}
+#assignment_dict = {index: geometry.wkt for index, geometry in sabs['geometry'].iteritems()}
 
 #initial_partition = Partition(arizona_bl_dg, 
   #                            assignment = assignment_dict, 
@@ -604,33 +604,6 @@ def calculate_gini(distributions):
     return(gini)
 
 
-# creating a function for the shannon biodiversity index
-def calculate_shannon(distributions):
-    import sys
-
-    def sdi(data):
-        """ Given a hash { 'species': count } , returns the SDI
-    
-        >>> sdi({'a': 10, 'b': 20, 'c': 30,})
-        1.0114042647073518"""
-    
-        from math import log as ln
-    
-        def p(n, N):
-            """ Relative abundance """
-            if n is  0:
-                return 0
-            else:
-                return (float(n)/N) * ln(float(n)/N)
-            
-        N = sum(data.values())
-    
-        return -sum(p(n, N) for n in data.values() if n is not 0)
-
-    if __name__ == '__main__':
-        import doctest
-        doctest.testmod()
-
 
 
 # Running the short bursts: 
@@ -750,7 +723,7 @@ ws.append(result)
 ws.title = "AZ Short Bursts Results"
 wb.save(filename = 'az_shortbursts_results.xlsx')
 wb.close()
-
+ 
 
 #Create a boxplot with the results 
 import pandas as pd
