@@ -42,3 +42,15 @@ def plot_all(blocks, district, schools, sabs, leaid, state_figures_dir):
     plt.show()
 
     return
+
+def plot_stackedbar(apportioned_students):
+    apportioned_students.drop('total', axis=1).plot(kind='bar', stacked=True, figsize=(10, 6), legend=True)
+    plt.title('Apportioned Students by Race Across Blocks (Non-Zero Populations Only)')
+    plt.xlabel('Census Block')
+    plt.ylabel('Number of Students')
+    # set x-axis tick labels to an empty list to reduce visual clutter
+    plt.xticks(ticks=[], labels=[])
+    # plot
+    plt.show()
+
+    return
