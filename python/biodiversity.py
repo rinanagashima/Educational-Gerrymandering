@@ -10,9 +10,10 @@ and the Simpson diversity index, both measures of biodiversity.
 
 
 import math
+import numpy as np
 
 
-
+"""
 # Define a dummy 'part' dictionary with made-up data
 part = {
     "black population": {"node1": 20, "node2": 30, "node3": 25},
@@ -24,6 +25,7 @@ part = {
     "multiracial population": {"node1": 5, "node2": 7, "node3": 6},
     "population": {"node1": 118, "node2": 107, "node3": 114}
 }
+"""
 
 
 # Define a function for Shannon's Diversity Index
@@ -37,7 +39,18 @@ def calculate_simpson_diversity(proportions):
     simpson_diversity = 1 - sum(p**2 for p in proportions)
     return simpson_diversity
 
+def calculate_dissimilarity(diversity_indices):
+    # Calculate the mean and standard deviation
+    mean_diversity = np.mean(diversity_indices)
+    std_dev_diversity = np.std(diversity_indices)
+    
+    # Calculate dissimilarity for each partition
+    dissimilarities = [(index - mean_diversity) / std_dev_diversity for index in diversity_indices]
+    
+    return dissimilarities
 
+
+"""
 # Initialize the list to hold Shannons and Simpsons diversity index for each partition (plan)
 shannons_diversity_indices = []
 simpsons_diversity_indices = []
@@ -165,4 +178,4 @@ for node in part["population"]:
 # now, print Shannon's and Simpson's diversity indices for each partition
 print("Shannon's Diversity:" , shannons_diversity_indices)
 print("Simpson's Diversity:", simpsons_diversity_indices)
-
+"""
