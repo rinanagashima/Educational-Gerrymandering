@@ -77,7 +77,79 @@ def proposal(initial_partition):
                         epsilon = .5, node_repeats = 1)
     return proposal1
 
+def calculate_partition_diversity(part):
+    # Initialize the lists for the diversity indices of each partition in the current burst
+    list_of_shannons = []
+    list_of_simpsons = []
+    # initialize proportions
+    proportions = []
+    # Here we calculate the racial distribution for each SAB
+    # First, list the populations by race for every node in the plan
+    blackpop = list((part["black population"].items())) 
+    whitepop = list((part["white population"].items())) 
+    hispanicpop = list((part["hispanic population"].items())) 
+    asianpop = list((part["asian population"].items())) 
+    nativeamericanpop = list((part["native american population"].items())) 
+    nhpipop = list((part["native hawaiian population"].items())) 
+    multiracepop = list((part["multiracial population"].items())) 
+    population = list((part["population"].items())) 
+    # initialize the distributions list
+    distributions = []
+    # For loop for every sab in the plan
+    for a, b, c, d, e, f, g, h in zip(blackpop, whitepop, hispanicpop, asianpop, nativeamericanpop, nhpipop, multiracepop, population):
+        # Calculate the spatial gini index
+        black_perc = (a[1]/h[1])
+        white_perc = (b[1]/h[1])
+        hispanic_perc = (c[1]/h[1])
+        asian_perc = (d[1]/h[1])
+        nativeamerican_perc = (e[1]/h[1])
+        nhpi_perc = (f[1]/h[1])
+        multirace_perc = (g[1]/h[1])
+        # Append the SAB's racial composition percentages to proportions
+        proportions = [black_perc, white_perc, hispanic_perc, asian_perc, nativeamerican_perc, nhpi_perc, multirace_perc]
+        
+        # Calculate diversity indices
+        shannon_diversity = calculate_shannon_diversity(proportions, num_races=len(proportions))
+        simpson_diversity = calculate_simpson_diversity(proportions)
+        
+        # Append the diversity indices to their respective lists
+        list_of_shannons.append(shannon_diversity)
+        list_of_simpsons.append(simpson_diversity)
+    ### now, calculate dissimilarity of the diversity indices into a single score
+    dissimilarity_shannon = calculate_dissimilarity(list_of_shannons)
+    dissimilarity_simpson = calculate_dissimilarity(list_of_simpsons)
+    
+    return dissimilarity_shannon, dissimilarity_simpson
 
+
+def find_next_seed(result, max, max_step, list_of_dissim_index):
+    """
+    This function should return the next initial partition
+    based on the maximum dissimilarity score.
+    It's not fully implemented here, as it depends on your specific logic.
+    """
+    # Iterating through the master list of the shannon and simpson index per burst
+
+    for step in range(len(list_of_dissim_index)):
+        # Identifies the burst step
+        print("step", step) 
+        # Print the shannon index for that step
+        print("list_of_dissim_index[step]:",list_of_dissim_index[step][0])
+        result.append(list_of_dissim_index[step][0])
+        # Print the max index value found across the burst
+        print("max index value:", max)  
+        current_dissim = list_of_dissim_index[step][0]
+        # Find the plan and the position of the maximum of list_of_shannons
+        if current_dissim >= max: 
+            max_step = step
+            max = current_dissim
+
+    # Prints the burst step that yielded the max shannons index
+    print('max_step:', max_step) 
+    # Set the initial partition of the next burst to the most recent plan 
+    # with the higher shannons index in the previous plan
+    initial_partition = list_of_dissim_index[max_step][1]
+    return initial_partition, result
 
 def shortbursts(burst_length, num_bursts, initial_partition, proposal1, capacities):
     total_steps = burst_length*num_bursts  # this is equal to num_bursts * burst_length.
@@ -105,10 +177,10 @@ def shortbursts(burst_length, num_bursts, initial_partition, proposal1, capaciti
     # for each burst:
     for i in range(num_bursts):
         print("Burst:", i)
-    
-        # Initialize the lists for the diversity indices of each partition in the current burst
-        list_of_shannons = []
-        list_of_simpsons = []
+        # initialize the list for dissimilarity of diversity indices
+        list_of_dissim_shannon = []
+        list_of_dissim_simpson = []
+        
         chain = MarkovChain(
             proposal = proposal1, 
             # school capacity constraint
@@ -119,71 +191,18 @@ def shortbursts(burst_length, num_bursts, initial_partition, proposal1, capaciti
             
         # for each partition (plan) in each burst, which is equal to the burst length:
         for part in chain:  
-            # initialize proportions
-            proportions = []
-            # Here we calculate the racial distribution for each SAB
-            # First, list the populations by race for every node in the plan
-            blackpop = list((part["black population"].items())) 
-            whitepop = list((part["white population"].items())) 
-            hispanicpop = list((part["hispanic population"].items())) 
-            asianpop = list((part["asian population"].items())) 
-            nativeamericanpop = list((part["native american population"].items())) 
-            nhpipop = list((part["native hawaiian population"].items())) 
-            multiracepop = list((part["multiracial population"].items())) 
-            population = list((part["population"].items())) 
-            # initialize the distributions list
-            distributions = []
-            # For loop for every sab in the plan
-            for a, b, c, d, e, f, g, h in zip(blackpop, whitepop, hispanicpop, asianpop, nativeamericanpop, nhpipop, multiracepop, population):
-                # Calculate the spatial gini index
-                black_perc = (a[1]/h[1])
-                white_perc = (b[1]/h[1])
-                hispanic_perc = (c[1]/h[1])
-                asian_perc = (d[1]/h[1])
-                nativeamerican_perc = (e[1]/h[1])
-                nhpi_perc = (f[1]/h[1])
-                multirace_perc = (g[1]/h[1])
-                # Append the SAB's racial composition percentages to proportions
-                proportions = [black_perc, white_perc, hispanic_perc, asian_perc, nativeamerican_perc, nhpi_perc, multirace_perc]
-                
-                # Calculate diversity indices
-                shannon_diversity = calculate_shannon_diversity(proportions, num_races=len(proportions))
-                simpson_diversity = calculate_simpson_diversity(proportions)
-                
-                # Append the diversity indices to their respective lists
-                list_of_shannons.append(shannon_diversity)
-                list_of_simpsons.append(simpson_diversity)
+            dissimilarity_shannon, dissimilarity_simpson = calculate_partition_diversity(part)
             
-            ### now, calculate dissimilarity of the diversity indices into a single score
-            dissimilarity_shannon = calculate_dissimilarity(list_of_shannons)
-            dissimilarity_simpson = calculate_dissimilarity(list_of_simpsons)
-            
-        max_shannons = [-1000]  # Initialize with -1000, a trivially small shannon index (positive numbers -> diverse)
-        max_simpsons = [-1000]
-        max_shannon_step = 0  # To store the step with the maximum shannon index
-        max_simpson_step = 0
-        # Iterating through the master list of the shannon and simpson index per burst
-
-        for step in range(len(list_of_shannons)): 
-            # Identifies the burst step
-            print("step", step) 
-            # Print the shannon index for that step
-            print("list_of_shannons[step][0]:", list_of_shannons[step][0]) 
-            result.append(list_of_shannons[step][0])
-            # Print the max shannons index found across the burst
-            print("max_shannons[0]:", max_shannons[0])  
-            # Find the plan and the position of the maximum of list_of_shannons
-            if list_of_shannons[step][0] >= max_shannons[0]: 
-                max_shannons_step = step
-                max_shannons = list_of_shannons[step]  
-
-        # Prints the burst step that yielded the max shannons index
-        print('max_shannons_step:', max_shannons_step) 
-        # Set the initial partition of the next burst to the most recent plan 
-        #with the higher shannons index in the previous plan
-        initial_partition = max_shannons[1] 
+            # now, append to their respective lists
+            list_of_dissim_shannon.append((dissimilarity_shannon, part))
+            list_of_dissim_simpson.append((dissimilarity_simpson, part))
         
+        # set the maximum dissimilarity score at -1000, a trivially small number
+        max = -1000
+        # initialize the step at which the maximum dissimilarity score by setting it to 0
+        max_step = 0
         
-    print("result", result)
-    return result
-                               
+        initial_partition, results_shannon = find_next_seed(result, max, max_step, list_of_dissim_shannon)
+        initial_partition, results_simpson = find_next_seed(result, max, max_step, list_of_dissim_shannon)
+        
+    return results_shannon, results_simpson

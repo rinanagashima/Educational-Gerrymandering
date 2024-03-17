@@ -1,8 +1,9 @@
 import matplotlib.pyplot as plt
 import os
+import numpy as np
 
 
-def plot_all(blocks, district, schools, sabs, leaid, state_figures_dir):
+def plot_all(blocks, district, schools, sabs, leaid, state_output_dir):
     # plot to make sure the census blocks are being mapped onto the school district properly
     # Create a figure and axis
     fig, ax = plt.subplots(figsize=(10, 10))
@@ -19,7 +20,7 @@ def plot_all(blocks, district, schools, sabs, leaid, state_figures_dir):
     ax.set_ylabel('Latitude')
 
     # save as png file
-    plt.savefig(os.path.join(state_figures_dir, f'{leaid}_allcensusblocks.png'))
+    plt.savefig(os.path.join(state_output_dir, f'{leaid}_allcensusblocks.png'))
 
     # plot
     plt.show()
@@ -29,7 +30,7 @@ def plot_all(blocks, district, schools, sabs, leaid, state_figures_dir):
     plt.axis('off')
 
     # save as png file
-    plt.savefig(os.path.join(state_figures_dir, f'{leaid}_sabs.png'))
+    plt.savefig(os.path.join(state_output_dir, f'{leaid}_sabs.png'))
 
     # plot
     plt.show()
@@ -53,4 +54,28 @@ def plot_stackedbar(apportioned_students):
     # plot
     plt.show()
 
+    return
+
+def plot_histogram(data, initial_dissim_shannon, state_abbrev, state_output_dir, leaid):
+    # Determine the bins for the histogram
+    count, bins, ignored = plt.hist(data, bins=10, alpha=0.75, color='blue', edgecolor='black', label='All Results')
+
+    # Find the bin that contains the 'initial_dissim_shannon'
+    bin_width = bins[1] - bins[0]
+    initial_bin = np.digitize(initial_dissim_shannon, bins) - 1  # Find the bin index, adjust by 1 due to 0-indexing
+
+    # Highlight the bin containing 'initial_dissim_shannon'
+    plt.bar(bins[initial_bin] + bin_width/2, count[initial_bin], width=bin_width, color='darkblue', edgecolor='black', label='Initial Dissimilarity')
+
+    # Add titles and labels
+    plt.title(f'Ensemble of plans in {state_abbrev} using short bursts')
+    plt.xlabel('Dissimilarity Score')
+    plt.ylabel('Frequency')
+    plt.legend()
+    
+    # save as png file
+    plt.savefig(os.path.join(state_output_dir, f'{leaid}_histogram.png'))
+
+    # Show plot
+    plt.show()
     return

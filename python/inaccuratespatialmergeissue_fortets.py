@@ -21,29 +21,25 @@ Professor Cannon's Math of Political Districting class.
 # Import the relevant libraries to run short bursts: 
 import matplotlib.pyplot as plt
 import random 
-import gerrychain
-import numpy as np
 import networkx as nx
 import geopandas as gpd
-import pickle
-import zipfile
 import os
 import pandas as pd
-import networkx as nx
 import fiona
+import numpy as np
+from openpyxl import Workbook
 
 # Import attributes of gerrychain that we need to create the initial partition: 
-from gerrychain import Graph, Partition, Election, proposals, updaters, constraints, accept 
-from gerrychain.updaters import cut_edges, Tally
-from gerrychain.tree import recursive_tree_part
+from gerrychain import Graph, Partition, updaters
+from gerrychain.updaters import Tally
 
 
 # Import functions from other files
-from a2_parser import parse_shapefiles, select_shapefiles
-from geopackage import save_shapefiles_gpkg, read_shapefiles_gpkg
-from visualizations import plot_all, plot_stackedbar
+#from a2_parser import parse_shapefiles, select_shapefiles
+from geopackage import read_shapefiles_gpkg
+from visualizations import plot_all, plot_stackedbar, plot_histogram
 from reapportionment import reapportion_students, apportioned_to_dg
-from markovchain import shortbursts, proposal, make_capacities_constraint
+from markovchain import shortbursts, proposal, make_capacities_constraint, calculate_partition_diversity
 
 """This is to make the code more replicable. For example, if we want the 
 same result twice, we can run the code with exactly the same random seed. """
@@ -75,7 +71,7 @@ leaid = "0402860"
 statefip = "04"
 fipnum = 4
 statecrs = "EPSG:32612"
-
+state_abbrev = "az"
 
 # Get Senior Thesis Directory
 python_dir = os.getcwd()
@@ -86,8 +82,8 @@ SeniorThesis_dir = os.path.dirname(code_dir)
 
 # Name other useful directories
 data_dir = os.path.join(SeniorThesis_dir, 'data')
-figures_dir = os.path.join(SeniorThesis_dir, 'figures')
-state_figures_dir = os.path.join(figures_dir, statefip)
+output_dir = os.path.join(SeniorThesis_dir, 'output')
+state_output_dir = os.path.join(output_dir, statefip)
 stata_dir = os.path.join(edu_gerry_dir, 'stata')
 
 
@@ -108,7 +104,7 @@ district = gpd.read_file(output_file_my, layer = 'layer_1')
 schools = gpd.read_file(output_file_my, layer = 'layer_2')
 sabs = gpd.read_file(output_file_my, layer = 'layer_3')
 
-plot_all(blocks, district, schools, sabs, leaid, state_figures_dir)
+plot_all(blocks, district, schools, sabs, leaid, state_output_dir)
 
 
 # Turn into a dual graph
@@ -350,7 +346,7 @@ plt.axis('off')
 plt.legend()
 
 # save as png file
-plt.savefig(os.path.join(state_figures_dir, f'{leaid}_initialpartition_orig.png'))
+plt.savefig(os.path.join(state_output_dir, f'{leaid}_initialpartition_orig.png'))
 
 # plot
 plt.show()
@@ -377,7 +373,7 @@ plt.axis('off')
 plt.legend()
 
 # save as png file
-plt.savefig(os.path.join(state_figures_dir, f'{leaid}_initialpartition_corrected.png'))
+plt.savefig(os.path.join(state_output_dir, f'{leaid}_initialpartition_corrected.png'))
 
 # plot
 plt.show()
@@ -421,23 +417,32 @@ updaters = {"population": Tally("total", alias = "population"),
           "white population": Tally('whitepop', alias = "white population")
           }
 initial_partition = Partition(bl_dg, assignment=ncessch_assignment_dict, updaters=updaters)
+# calculate dissimilarity index for initial partition
+initial_dissim_shannon, initial_dissim_simpson = calculate_partition_diversity(initial_partition)
+
 
 ## Specify the parameters of the short bursts: 
-burst_length = 100  # length of each burst
-num_bursts = 50  # number of bursts in the run
+burst_length = 10  # length of each burst
+num_bursts = 5  # number of bursts in the run
 proposal1 = proposal(initial_partition)
 capacities = make_capacities_constraint(initial_partition)
 # run the short bursts markov chain
-result = shortbursts(burst_length, num_bursts, initial_partition, proposal1, capacities)
+results_shannon, results_simpson = shortbursts(burst_length, num_bursts, initial_partition, proposal1, capacities)
 
 
-#Input results of short burst into an excel sheet. Repeat with other burst lengths
-from openpyxl import Workbook
+# Input results of short burst into an excel sheet.
 wb = Workbook()
 ws =  wb.active
-ws.append(result)
-ws.title = "AZ Short Bursts Results"
-wb.save(filename = 'az_shortbursts_results.xlsx')
+ws.append(results_simpson)
+ws.title = f"{statefip} Short Bursts Results"
+filename = os.path.join(state_output_dir, f'{state_abbrev}_shortbursts_results.xlsx')
+wb.save(filename = filename)
 wb.close()
  
+
+# now, create and save a histogram of results
+# add initial dissimilarity score to all scores
+all_scores = []
+all_scores = results_simpson + [initial_dissim_simpson]
+plot_histogram(all_scores, initial_dissim_shannon, state_abbrev, state_output_dir, leaid)
 
