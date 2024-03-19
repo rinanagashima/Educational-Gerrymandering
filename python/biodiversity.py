@@ -39,14 +39,12 @@ def calculate_simpson_diversity(proportions):
     simpson_diversity = 1 - sum(p**2 for p in proportions)
     return simpson_diversity
 
-def calculate_dissimilarity(diversity_indices):
-    # Calculate the mean and standard deviation
-    mean_diversity = np.mean(diversity_indices)
-    std_dev_diversity = np.std(diversity_indices)
-    
-    # Calculate dissimilarity for each partition
-    dissimilarities = np.mean([(index - mean_diversity) / std_dev_diversity for index in diversity_indices])
-    
-    return dissimilarities
-
+def calculate_gini(diversity_indices):
+    total = 0
+    n = len(diversity_indices)
+    for i, xi in enumerate(diversity_indices[:-1]):
+        # Calculate the absolute difference between xi and each element in the slice
+        differences = np.abs(xi - np.array(diversity_indices[i+1:]))
+        total += np.sum(differences)
+    return total / (2* n**2 * np.mean(diversity_indices))
 
