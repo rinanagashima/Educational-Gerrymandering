@@ -119,9 +119,7 @@ Description:
     - Call parser() using this current file (a2_parser.py) to save shapefiles to a GeoPackage
     - If you want the shapefiles in a variable, call read_shapefiles
 '''
-def parser():
-    
-    leaid = "0402860"
+def parser(leaid):
     statefip = "04"
     statecrs = "EPSG:32612"
 
@@ -143,4 +141,5 @@ def parser():
 
 # Uncomment this if you want to run JUST this a2_parser.py file.
 # If calling parser() from a different file, comment this out.
-#parser()
+# set district number, state fip, and state crs
+# parser(leaid)
