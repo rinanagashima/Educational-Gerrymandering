@@ -18,13 +18,12 @@ majority-minority districts observed per burst are recorded.
 
 ## Import additional attributes from Gerrychain required to run the short bursts: 
 from gerrychain import MarkovChain
-from gerrychain.constraints import single_flip_contiguous, contiguous
-from gerrychain.proposals import propose_random_flip, recom
+from gerrychain.proposals import recom
 from functools import partial
 from gerrychain.accept import always_accept
 
 # import biodiversity indices
-from biodiversity import calculate_shannon_diversity, calculate_simpson_diversity, calculate_dissimilarity
+from biodiversity import calculate_shannon_diversity, calculate_simpson_diversity, calculate_gini
 
 
 
@@ -37,27 +36,23 @@ from biodiversity import calculate_shannon_diversity, calculate_simpson_diversit
 # 1) Population constraint: 
 def make_capacities_constraint(initial_partition):        
     def capacities(partition):
-        # Print the available keys in the partition's population data for debugging
-        #print("Available ncessch keys in partition:", partition.keys())
-        #print(partition["cut_edges"])
-        
         # Iterate through each part's (sab's) population in the partition
         for district_id in partition.parts.keys():
+            # set the school ID number
             school_id = district_id
-            #print(school_id)
+            # set the ideal population for each school based on the initial partition
             ideal_pop = initial_partition['population']
+            # set the initial population
             initial_pop = ideal_pop[school_id]
-            #print(initial_pop)
-            #print(partition.population)
+            # define the current partition's population
             current_pop = partition["population"][school_id]
+            # define upper and lower bounds
             lower_bound = initial_pop * 0.9
             upper_bound = initial_pop * 1.1
                 
             # Check if current population is within the bounds
             if not (lower_bound <= current_pop <= upper_bound):
-                #print(school_id, " is not within bounds")
                 return False  # If any district is out of bounds, return False
-        print("All districts are within bounds")
         return True  # If all districts are within bounds, return True
     return capacities                                                
 
@@ -93,8 +88,6 @@ def calculate_partition_diversity(part):
     nhpipop = list((part["native hawaiian population"].items())) 
     multiracepop = list((part["multiracial population"].items())) 
     population = list((part["population"].items())) 
-    # initialize the distributions list
-    distributions = []
     # For loop for every sab in the plan
     for a, b, c, d, e, f, g, h in zip(blackpop, whitepop, hispanicpop, asianpop, nativeamericanpop, nhpipop, multiracepop, population):
         # Calculate the spatial gini index
@@ -116,8 +109,8 @@ def calculate_partition_diversity(part):
         list_of_shannons.append(shannon_diversity)
         list_of_simpsons.append(simpson_diversity)
     ### now, calculate dissimilarity of the diversity indices into a single score
-    dissimilarity_shannon = calculate_dissimilarity(list_of_shannons)
-    dissimilarity_simpson = calculate_dissimilarity(list_of_simpsons)
+    dissimilarity_shannon = calculate_gini(list_of_shannons)
+    dissimilarity_simpson = calculate_gini(list_of_simpsons)
     
     return dissimilarity_shannon, dissimilarity_simpson
 
@@ -131,13 +124,8 @@ def find_next_seed(result, max, max_step, list_of_dissim_index):
     # Iterating through the master list of the shannon and simpson index per burst
 
     for step in range(len(list_of_dissim_index)):
-        # Identifies the burst step
-        print("step", step) 
-        # Print the shannon index for that step
-        print("list_of_dissim_index[step]:",list_of_dissim_index[step][0])
         result.append(list_of_dissim_index[step][0])
-        # Print the max index value found across the burst
-        print("max index value:", max)  
+        # define the current dissimilarity index
         current_dissim = list_of_dissim_index[step][0]
         # Find the plan and the position of the maximum of list_of_shannons
         if current_dissim >= max: 
@@ -145,15 +133,14 @@ def find_next_seed(result, max, max_step, list_of_dissim_index):
             max = current_dissim
 
     # Prints the burst step that yielded the max shannons index
-    print('max_step:', max_step) 
+    print('max_step for the next burst:', max_step) 
     # Set the initial partition of the next burst to the most recent plan 
     # with the higher shannons index in the previous plan
     initial_partition = list_of_dissim_index[max_step][1]
     return initial_partition, result
 
 def shortbursts(burst_length, num_bursts, initial_partition, proposal1, capacities):
-    total_steps = burst_length*num_bursts  # this is equal to num_bursts * burst_length.
-    
+
     """
     RE=WRITE THIS COMMENT LATER
     This is the code to run the short bursts for range(num_bursts) number of times. 
@@ -164,19 +151,13 @@ def shortbursts(burst_length, num_bursts, initial_partition, proposal1, capaciti
     number of majority minority districts per burst, which is reflected in max1[1] 
     and max1[0] respectively.
     """
-    list_of_max = []
     result = []
 
-    # Initialize the list to hold Shannons and Simpsons diversity index for each partition (plan)
-    shannons_diversity_indices = []
-    simpsons_diversity_indices = []
-    
     # placeholder for results
     result = []
     
     # for each burst:
     for i in range(num_bursts):
-        print("Burst:", i)
         # initialize the list for dissimilarity of diversity indices
         list_of_dissim_shannon = []
         list_of_dissim_simpson = []
@@ -203,6 +184,6 @@ def shortbursts(burst_length, num_bursts, initial_partition, proposal1, capaciti
         max_step = 0
         
         initial_partition, results_shannon = find_next_seed(result, max, max_step, list_of_dissim_shannon)
-        initial_partition, results_simpson = find_next_seed(result, max, max_step, list_of_dissim_shannon)
+        initial_partition, results_simpson = find_next_seed(result, max, max_step, list_of_dissim_simpson)
         
     return results_shannon, results_simpson
