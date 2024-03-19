@@ -19,14 +19,11 @@ Professor Cannon's Math of Political Districting class.
 """
 
 # Import the relevant libraries to run short bursts: 
-import matplotlib.pyplot as plt
 import random 
 import networkx as nx
 import geopandas as gpd
 import os
 import pandas as pd
-import fiona
-import numpy as np
 from openpyxl import Workbook
 
 # Import attributes of gerrychain that we need to create the initial partition: 
@@ -35,9 +32,9 @@ from gerrychain.updaters import Tally
 
 
 # Import functions from other files
-#from a2_parser import parse_shapefiles, select_shapefiles
+#from parser import parse_shapefiles, select_shapefiles
 from geopackage import read_shapefiles_gpkg
-from visualizations import plot_all, plot_stackedbar, plot_histogram
+from visualizations import plot_all, plot_initialpartition, plot_stackedbar, plot_histogram
 from reapportionment import reapportion_students, apportioned_to_dg
 from markovchain import shortbursts, proposal, make_capacities_constraint, calculate_partition_diversity
 
@@ -83,7 +80,7 @@ SeniorThesis_dir = os.path.dirname(code_dir)
 # Name other useful directories
 data_dir = os.path.join(SeniorThesis_dir, 'data')
 output_dir = os.path.join(SeniorThesis_dir, 'output')
-state_output_dir = os.path.join(output_dir, statefip)
+state_output_dir = os.path.join(output_dir, statefip, leaid)
 stata_dir = os.path.join(edu_gerry_dir, 'stata')
 
 
@@ -92,11 +89,11 @@ output_file_my = os.path.join(data_dir, statefip, 'geopackages', leaid, 'my_shap
 
 # Load Shapefiles from GeoPackage
 my_shapefiles_loaded = read_shapefiles_gpkg(output_file_my)
-print(f"my_shapefiles loaded from GeoPackage for LEAID={leaid}")
+#print(f"my_shapefiles loaded from GeoPackage for LEAID={leaid}")
 
 # list layers in geopackage
-layers = fiona.listlayers(output_file_my)
-print(layers)
+#layers = fiona.listlayers(output_file_my)
+#print(layers)
 
 # read in the layers as GeoDataframes
 blocks = gpd.read_file(output_file_my, layer = 'layer_0')
@@ -109,7 +106,6 @@ plot_all(blocks, district, schools, sabs, leaid, state_output_dir)
 
 # Turn into a dual graph
 bl_dg = Graph.from_geodataframe(blocks, ignore_errors=False)
-print(bl_dg)
 
 # TODO: figure out if this is needed
 # # Step 2: Create a mapping of 'GEOID10' to geometry
@@ -130,100 +126,13 @@ stata_output_dir = os.path.join(stata_dir, 'output')
 dta_dir = os.path.join(stata_output_dir, 'dta')
 sdd_path = os.path.join(dta_dir, "mergedurbanschooldata.nvc.dta")  # School Demographic Data file path
 
-'''
-RINA
-RINA
-RINA
-RINA
-RINA
-
-SDD
-MEANS
-SCHOOL DEMOGRAPHIC DATA
-
-SDD
-MEANS
-SCHOOL DEMOGRAPHIC DATA
-
-SDD
-MEANS
-SCHOOL DEMOGRAPHIC DATA
-
-RINA
-RINA
-RINA
-RINA
-RINA
-'''
 sdd = pd.read_stata(sdd_path) 
-# Filter rows where 'fips' is equal to 'Arizona'
-sdd_state = sdd[sdd['fips'] == fipnum]
-# Print the filtered DataFrame
-print(sdd_state)
+# only keep the observations for the selected state and school district/leaid.
+my_sdd = sdd[(sdd['fips'] == fipnum) & (sdd['leaid'] == leaid)]
+#print(my_sdd['school_name'])
 
-'''
-RINA
-RINA
-RINA
-RINA
-RINA
-
-SDD
-MEANS
-SCHOOL DEMOGRAPHIC DATA
-
-SDD
-MEANS
-SCHOOL DEMOGRAPHIC DATA
-
-SDD
-MEANS
-SCHOOL DEMOGRAPHIC DATA
-
-RINA
-RINA
-RINA
-RINA
-RINA
-'''
-
-
-# only keep the observations for the selected school district/leaid.
-my_sdd = sdd_state[sdd_state['leaid'] == leaid]
-print(my_sdd['school_name'])
-
-# Merge the urban institute data with the school site pt geometries
-merge_columns_sdd = ['ncessch']
-merge_columns_schools = ['ncessch']
 # merge sdd leaid and school site locations, keeping only observations that exist in my_sdd (i.e., only the selected school district)
-merge_sdd_schools = pd.merge(schools, my_sdd, left_on=merge_columns_schools, right_on = merge_columns_sdd, how="inner")
-
-'''
-RINA
-RINA
-RINA
-RINA
-RINA
-
-SDD
-MEANS
-SCHOOL DEMOGRAPHIC DATA
-
-SDD
-MEANS
-SCHOOL DEMOGRAPHIC DATA
-
-SDD
-MEANS
-SCHOOL DEMOGRAPHIC DATA
-
-RINA
-RINA
-RINA
-RINA
-RINA
-'''
-
+merge_sdd_schools = pd.merge(schools, my_sdd, on = ['ncessch'], how="inner")
 # keep only the sabs that are in sdd dataframe
 merge_sabs_sdd = pd.merge(merge_sdd_schools, sabs, left_on=['ncessch'], right_on = ['ncessch'], how="inner")
 # Set 'geometry_y' as the active geometry column, which is the attendance boundary polygons
@@ -291,8 +200,8 @@ for block_node in bl_dg.nodes:
         if num_sabs_nodes > 1:
             if overlap_district < .9:
                 potential_matches.append((sabs_node, overlap_percentage))
-            else:
-                print("The sabs intersected with more than 90% of the school district and was removed")
+            #else:
+                #print("The sabs intersected with more than 90% of the school district and was removed")
         else:
             potential_matches.append((sabs_node, overlap_percentage))
 
@@ -306,10 +215,10 @@ for block_node in bl_dg.nodes:
             block_num = bl_dg.nodes[block_node]['GEOID10']
             ncessch_assignment_dict[block_node] = ncessch
             full_sabs_dict[block_num] = ncessch
-        else: 
-            print(f"Less than or equal to 0% of block {block_node} is within any SAB")
-    else:
-        print(f"No suitable SAB found for block {block_node}")
+        #else: 
+            #print(f"Less than or equal to 0% of block {block_node} is within any SAB")
+    #else:
+        #print(f"No suitable SAB found for block {block_node}")
 
 
 # Set the 'ncessch_assignment' attribute for nodes in bl_dg
@@ -326,7 +235,7 @@ for node in bl_dg.nodes:
     # Check if 'ncessch_assignment' attribute is None or empty
     if bl_dg.nodes[node]['ncessch_assignment'] is None:
         no_sab_count += 1
-        print(f"Block node {block_num} has no SAB assignment")
+        #print(f"Block node {block_num} has no SAB assignment")
 
 # Print the total count of blocks with no SAB
 print(f"Total blocks with no SAB: {no_sab_count} out of {num_blocks}")
@@ -340,17 +249,8 @@ for node in missing_nodes:
 
 # Create the initial_partition using the dual graph from sabs
 initial_partition = Partition(bl_dg, assignment=ncessch_assignment_dict, updaters={})
-# Create a plot of the initial partition to make sure it loaded properly
-initial_partition.plot()
-plt.axis('off')
-plt.legend()
-
-# save as png file
-plt.savefig(os.path.join(state_output_dir, f'{leaid}_initialpartition_orig.png'))
-
-# plot
-plt.show()
-
+# plot and save figure in output folder
+plot_initialpartition(initial_partition, state_output_dir, f'{leaid}_initialpartition_orig.png')
 
 #### now, re-assign blocks with '-9999' based on adjacency
 # Identify and store adjacent nodes for each '-9999' node
@@ -366,17 +266,8 @@ for node, neighbors in unassigned_nodes.items():
 
 # Update the partition with the new assignments
 initial_partition = Partition(bl_dg, assignment=ncessch_assignment_dict, updaters={})
-
-# Graph to check
-initial_partition.plot()
-plt.axis('off')
-plt.legend()
-
-# save as png file
-plt.savefig(os.path.join(state_output_dir, f'{leaid}_initialpartition_corrected.png'))
-
-# plot
-plt.show()
+# plot and save figure in output folder
+plot_initialpartition(initial_partition, state_output_dir, f'{leaid}_initialpartition_corrected.png')
 
 
 
@@ -422,8 +313,8 @@ initial_dissim_shannon, initial_dissim_simpson = calculate_partition_diversity(i
 
 
 ## Specify the parameters of the short bursts: 
-burst_length = 10  # length of each burst
-num_bursts = 5  # number of bursts in the run
+burst_length = 100  # length of each burst
+num_bursts = 50  # number of bursts in the run
 proposal1 = proposal(initial_partition)
 capacities = make_capacities_constraint(initial_partition)
 # run the short bursts markov chain
@@ -433,9 +324,13 @@ results_shannon, results_simpson = shortbursts(burst_length, num_bursts, initial
 # Input results of short burst into an excel sheet.
 wb = Workbook()
 ws =  wb.active
-ws.append(results_simpson)
-ws.title = f"{statefip} Short Bursts Results"
-filename = os.path.join(state_output_dir, f'{state_abbrev}_shortbursts_results.xlsx')
+ws.title = f"{statefip} {leaid} Short Bursts Results"
+# create a column header
+ws.append(['Gini from Simpsons'])
+# transpose the list (row of data) into a column of data
+for item in results_simpson:
+    ws.append([item]) # this makes each item its own row
+filename = os.path.join(state_output_dir, f'{state_abbrev}_{leaid}_simpsons_shortbursts_results.xlsx')
 wb.save(filename = filename)
 wb.close()
  

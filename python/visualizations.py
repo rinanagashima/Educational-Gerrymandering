@@ -44,6 +44,19 @@ def plot_all(blocks, district, schools, sabs, leaid, state_output_dir):
 
     return
 
+def plot_initialpartition(initial_partition, state_output_dir, filename):
+    # Create a plot of the initial partition to make sure it loaded properly
+    initial_partition.plot()
+    plt.axis('off')
+    plt.legend()
+    
+    # save as png file
+    plt.savefig(os.path.join(state_output_dir, filename))
+    
+    # plot
+    plt.show()
+    return
+    
 def plot_stackedbar(apportioned_students):
     apportioned_students.drop('total', axis=1).plot(kind='bar', stacked=True, figsize=(10, 6), legend=True)
     plt.title('Apportioned Students by Race Across Blocks (Non-Zero Populations Only)')
@@ -68,13 +81,12 @@ def plot_histogram(data, initial_dissim_shannon, state_abbrev, state_output_dir,
     plt.bar(bins[initial_bin] + bin_width/2, count[initial_bin], width=bin_width, color='darkblue', edgecolor='black', label='Initial Dissimilarity')
 
     # Add titles and labels
-    plt.title(f'Ensemble of plans in {state_abbrev} using short bursts')
     plt.xlabel('Dissimilarity Score')
     plt.ylabel('Frequency')
     plt.legend()
     
     # save as png file
-    plt.savefig(os.path.join(state_output_dir, f'{leaid}_histogram.png'))
+    plt.savefig(os.path.join(state_output_dir, f'{leaid}_shortbursts_simpsons_histogram.png'))
 
     # Show plot
     plt.show()
