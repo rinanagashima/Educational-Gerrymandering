@@ -57,13 +57,17 @@ def plot_initialpartition(initial_partition, state_output_dir, filename):
     plt.show()
     return
     
-def plot_stackedbar(apportioned_students):
+def plot_stackedbar(apportioned_students, state_output_dir, leaid):
     apportioned_students.drop('total', axis=1).plot(kind='bar', stacked=True, figsize=(10, 6), legend=True)
     plt.title('Apportioned Students by Race Across Blocks (Non-Zero Populations Only)')
     plt.xlabel('Census Block')
     plt.ylabel('Number of Students')
     # set x-axis tick labels to an empty list to reduce visual clutter
     plt.xticks(ticks=[], labels=[])
+    
+    # save as png file
+    plt.savefig(os.path.join(state_output_dir, f'{leaid}_racialbreakdown.png'))
+    
     # plot
     plt.show()
 
