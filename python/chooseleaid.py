@@ -76,16 +76,21 @@ leaid_dir = os.path.join(data_dir, statefip, 'leaidlist')
 
 # now, create a loop for all school districts (leaid) in the state with multiple sabs:
 leaid_list_path = os.path.join(leaid_dir, f'leaid_multsabsonly_{statefip}.csv')
-# import the list of leaid as a pandas DataFrame
+# import the list of leaid
 leaid_list = pd.read_csv(leaid_list_path, dtype={'leaid': str})
+
 # iterate through each row in the dataframe
 for index, row in leaid_list.iterrows():
     leaid = row['leaid']
     print(leaid)
     # define district-specific output directory
     state_output_dir = os.path.join(output_dir, statefip, leaid)
+    # create the directory if it does not exist
+    if not os.path.exists(state_output_dir):
+        os.makedirs(state_output_dir)
+        
     # parse shapefiles for the district
-    parser(leaid)
+    parser(leaid, statefip, statecrs)
 
     # Shapefiles for specific district
     output_file_my = os.path.join(data_dir, statefip, 'geopackages', leaid, 'my_shapefiles.gpkg')
